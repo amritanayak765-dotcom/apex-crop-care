@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>APEX Smart Kisan Platform</title>
+  <style>
+    :root {
+      --bg: #0b132b;
+      --card-bg: #1c2541;
+      --accent: #10b981;
+      --text: #ffffff;
+      --text-sub: #9ca3af;
+      --warning: #f59e0b;
+      --border: #374151;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, sans-serif; }
+    body { background-color: var(--bg); color: var(--text); padding: 15px; }
+
+    header {
+      display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center;
+      padding: 15px 20px; background: var(--card-bg); border-radius: 10px; margin-bottom: 20px;
+      border: 1px solid var(--border);
+    }
+
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+    .card { background: var(--card-bg); border-radius: 12px; padding: 20px; border: 1px solid var(--border); }
+    .card h2 { font-size: 1.1rem; margin-bottom: 12px; color: var(--accent); }
+
+    .btn-group { display: flex; gap: 10px; margin-bottom: 10px; }
+    button {
+      background: var(--accent); color: white; border: none; padding: 10px 15px;
+      border-radius: 6px; cursor: pointer; font-weight: bold; width: 100%; margin-top: 5px;
+    }
+    button.secondary { background: #3b82f6; }
+    button:hover { opacity: 0.9; }
+
+    video, canvas, img { width: 100%; border-radius: 8px; background: #000; margin-top: 5px; }
+    input, select {
+      width: 100%; padding: 8px; margin: 5px 0 10px; background: var(--bg);
+      color: white; border: 1px solid var(--border); border-radius: 5px;
+    }
+    .output-box { background: rgba(255,255,255,0.05); padding: 12px; border-radius: 6px; margin-top: 10px; font-size: 0.9rem; }
+  </style>
+
+  <!-- 25+ Multilingual Translate Engine Integration -->
+  <script type="text/javascript">
+    function googleTranslateElementInit() {
+      new google.translate.TranslateElement({
+        pageLanguage: 'en',
+        includedLanguages: 'hi,bn,te,mr,ta,ur,gu,kn,or,pa,ml,as,ne,sd,fr,es,de,zh-CN,ar,ru,pt,ja,id,sw,fa',
+        layout: google.translate.TranslateElement.InlineLayout.SIMPLE
+      }, 'google_translate_element');
+    }
+  </script>
+  <script type="text/javascript" src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
+</head>
+<body>
+
+  <header>
+    <div>
+      <h1>🌾 APEX Smart Crop Care</h1>
+      <p style="font-size: 0.8rem; color: var(--text-sub);">Python FastAPI AI Engine</p>
+    </div>
+    <div>
+      <span style="font-size: 0.85rem; margin-right: 5px;">Language:</span>
+      <div id="google_translate_element" style="display:inline-block;"></div>
+    </div>
+  </header>
+
+  <div class="grid">
+    <!-- Camera & Gallery Scan Card -->
+    <div class="card">
+      <h2>📸 Camera & Gallery Scan</h2>
+      
+      <div class="btn-group">
+        <button type="button" onclick="startCamera()">📷 Open Camera</button>
+        <button type="button" class="secondary" onclick="document.getElementById('galleryInput').click()">📁 Open Gallery</button>
+      </div>
+
+      <input type="file" id="galleryInput" accept="image/*" style="display:none" onchange="handleGallerySelect(event)">
+
+      <video id="videoStream" autoplay playsinline style="display:none;"></video>
+      <button id="snapBtn" onclick="takeSnapshot()" style="display:none; background: #ef4444;">🔴 Capture Photo</button>
+      
+      <canvas id="photoCanvas" style="display:none;"></canvas>
+      <img id="imagePreview" style="display:none;" alt="Crop Leaf Preview">
+
+      <button onclick="uploadToPythonBackend()">Run Python AI Scan</button>
+
+      <div id="scanResult" class="output-box" style="display:none;">
+        <p><strong>Diagnosis:</strong> <span id="resDisease"></span></p>
+        <p><strong>AI Confidence:</strong> <span id="resConf"></span>%</p>
+        <p id="resAdvisory"></p>
+        <p id="kvkAlert" style="color: var(--warning); display:none; margin-top: 5px;">
+          ⚠️ Confidence low (&lt;85%). Scan auto-routed to KVK Expert[span_0](start_span)[span_0](end_span)!
+        </p>
+      </div>
+    </div>
+
+    <!-- Python Dosage Calculator Card -->
+    <div class="card">
+      <h2>🧮 Spray Dosage Calculator</h2>
+      <label>Field Size (Acres):</label>
+      <input type="number" id="fieldAcres" value="1.0" step="0.5">
+      <button onclick="fetchDosageFromPython()">Calculate via Python</button>
+
+      <div id="dosageBox" class="output-box" style="display:none;">
+        <p>Required Water: <strong id="dosWater" style="color:var(--accent);"></strong> Liters</p>
+        <p>Required Chemical: <strong id="dosChem" style="color:var(--accent);"></strong> grams</p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let activeBlob = null;
+
+    // 1. Camera Control
+    async function startCamera() {
+      document.getElementById('imagePreview').style.display = 'none';
+      const video = document.getElementById('videoStream');
+      const snapBtn = document.getElementById('snapBtn');
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+        video.srcObject = stream;
+        video.style.display = 'block';
+        snapBtn.style.display = 'block';
+      } catch (err) {
+        alert("Camera permission denied.");
+      }
+    }
+
+    function takeSnapshot() {
+      const video = document.getElementById('videoStream');
+      const canvas = document.getElementById('photoCanvas');
+      const img = document.getElementById('imagePreview');
+      
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      canvas.getContext('2d').drawImage(video, 0, 0);
+
+      canvas.toBlob((blob) => {
+        activeBlob = blob;
+        img.src = URL.createObjectURL(blob);
+        img.style.display = 'block';
+        video.style.display = 'none';
+        document.getElementById('snapBtn').style.display = 'none';
+        video.srcObject.getTracks().forEach(track => track.stop());
+      }, 'image/jpeg');
+    }
+
+    // 2. Gallery Input
+    function handleGallerySelect(e) {
+      if (e.target.files.length > 0) {
+        const file = e.target.files[0];
+        activeBlob = file;
+        const img = document.getElementById('imagePreview');
+        img.src = URL.createObjectURL(file);
+        img.style.display = 'block';
+        document.getElementById('videoStream').style.display = 'none';
+        document.getElementById('snapBtn').style.display = 'none';
+      }
+    }
+
+    // 3. Send Request to Python FastAPI
+    async function uploadToPythonBackend() {
+      if (!activeBlob) {
+        alert("Camera se photo click karein ya gallery se select karein!");
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append("file", activeBlob, "leaf.jpg");
+
+      try {
+        const response = await fetch("http://127.0.0.1:8000/api/diagnose", {
+          method: "POST",
+          body: formData
+        });
+        const data = await response.json();
+
+        document.getElementById('resDisease').innerText = data.disease;
+        document.getElementById('resConf').innerText = data.confidence;
+        document.getElementById('resAdvisory').innerText = data.advisory;
+        document.getElementById('kvkAlert').style.display = data.routed_to_kvk_expert ? 'block' : 'none';
+        document.getElementById('scanResult').style.display = 'block';
+      } catch (err) {
+        alert("Pehle terminal me python main.py run karein!");
+      }
+    }
+
+    // 4. Fetch Dosage from Python Backend
+    async function fetchDosageFromPython() {
+      const acres = document.getElementById('fieldAcres').value;
+      try {
+        const res = await fetch(`http://127.0.0.1:8000/api/dosage?acres=${acres}&disease_type=blight`);
+        const data = await res.json();
+        document.getElementById('dosWater').innerText = data.water_liters;
+        document.getElementById('dosChem').innerText = data.chemical_grams;
+        document.getElementById('dosageBox').style.display = 'block';
+      } catch(err) {
+        alert("Python Backend connect nahi ho pa raha!");
+      }
+    }
+  </script>
+</body>
+</html>
