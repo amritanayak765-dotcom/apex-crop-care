@@ -194,7 +194,9 @@
     async function fetchDosageFromPython() {
       const acres = document.getElementById('fieldAcres').value;
       try {
-        const res = await fetch(`http://127.0.0.1:8000/api/dosage?acres=${acres}&disease_type=blight`);
+            const res = await fetch(`/api/dosage?acres=${acres}&disease_type=blight`);
+    
+    
         const data = await res.json();
         document.getElementById('dosWater').innerText = data.water_liters;
         document.getElementById('dosChem').innerText = data.chemical_grams;
